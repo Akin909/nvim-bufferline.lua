@@ -39,6 +39,9 @@ local state = {
   current_letters = {},
   custom_sort = nil,
   preferences = {},
+  recent_visits = setmetatable({}, { __index = function()
+    return 0
+  end }),
 }
 
 if utils.is_test() then
@@ -328,6 +331,16 @@ local function add_suffix(context)
     length = length + (buffer.modified and modified_size or size)
   end
   return component, length
+end
+
+function M.count_visit()
+  local buf = api.nvim_get_current_buf()
+  for _, b in pairs(state.buffers) do
+    if b.id == buf then
+      local previous_count = state.recent_visits[b.id] or 0
+      state.recent_visits[b.id] = previous_count + 1
+    end
+  end
 end
 
 --- TODO We increment the buffer length by the separator although the final
@@ -696,7 +709,7 @@ local function bufferline(preferences)
 
   -- if the user has reschuffled the buffers manually don't try and sort them
   if not state.custom_sort then
-    sort.sort_buffers(preferences.options.sort_by, state.buffers)
+    sort.sort_buffers(preferences.options.sort_by, state)
   end
 
   return render(state.buffers, all_tabs, preferences)
@@ -812,18 +825,19 @@ function M.sort_buffers_by(sort_by)
   refresh()
 end
 
+---Create miscellaneous autocommands
+---@param preferences table
 local function setup_autocommands(preferences)
-  local autocommands = {
-    { "ColorScheme", "*", [[lua __setup_bufferline_colors()]] },
-  }
-  if preferences.options.persist_buffer_sort then
+  local opts = preferences.options
+  local autocommands = { { "ColorScheme", "*", [[lua __setup_bufferline_colors()]] } }
+  if opts.persist_buffer_sort then
     table.insert(autocommands, {
       "SessionLoadPost",
       "*",
       [[lua require'bufferline'.restore_positions()]],
     })
   end
-  if not preferences.options.always_show_bufferline then
+  if not opts.always_show_bufferline then
     -- toggle tabline
     table.insert(autocommands, {
       "VimEnter,BufAdd,TabEnter",
@@ -831,13 +845,17 @@ local function setup_autocommands(preferences)
       "lua require'bufferline'.toggle_bufferline()",
     })
   end
-  local loaded = pcall(require, "nvim-web-devicons")
-  if loaded then
-    table.insert(autocommands, {
-      "ColorScheme",
-      "*",
-      [[lua require'nvim-web-devicons'.setup()]],
-    })
+
+  if opts.sort_by then
+    sort.setup(autocommands, opts.sort_by)
+  end
+
+  local ok = pcall(require, "nvim-web-devicons")
+  if ok then
+    table.insert(
+      autocommands,
+      { "ColorScheme", "*", [[lua require'nvim-web-devicons'.setup()]] }
+    )
   end
 
   utils.nvim_create_augroups({ BufferlineColors = autocommands })

@@ -1,17 +1,30 @@
 local M = {}
+
 ---------------------------------------------------------------------------//
 -- Sorters
 ---------------------------------------------------------------------------//
 local fnamemodify = vim.fn.fnamemodify
 
--- @param path string
+---@param path string
+---@return string
 local function full_path(path)
   return fnamemodify(path, ":p")
 end
 
--- @param path string
+---@param path string
+---@return string
 local function is_relative_path(path)
   return full_path(path) ~= path
+end
+
+---Sort buffers by the most recently visited
+---comment
+---@param recent_visits table<string,number>
+---@return function(buf_a: Buffer, buf_b: Buffer): boolean
+local function sort_by_recent(recent_visits)
+  return function(buf_a, buf_b)
+    return recent_visits[buf_a.id] > recent_visits[buf_b.id]
+  end
 end
 
 --- @param buf_a Buffer
@@ -42,16 +55,33 @@ end
 
 --- sorts a list of buffers in place
 --- @param sort_by string|function
---- @param buffers Buffer[]
-function M.sort_buffers(sort_by, buffers)
+--- @param state table
+function M.sort_buffers(sort_by, state)
+  --@type Buffers[]
+  local buffers = state.buffers
   if sort_by == "extension" then
     table.sort(buffers, sort_by_extension)
   elseif sort_by == "directory" then
     table.sort(buffers, sort_by_directory)
   elseif sort_by == "relative_directory" then
     table.sort(buffers, sort_by_relative_directory)
+  elseif sort_by == "recent" then
+    table.sort(buffers, sort_by_recent(state.recent_visits))
   elseif type(sort_by) == "function" then
     table.sort(buffers, sort_by)
+  end
+end
+
+---Setup autocommands for complex sorters
+---@param autocommands table[]
+---@param sort_by string
+function M.setup(autocommands, sort_by)
+  if sort_by == "recent" then
+    table.insert(autocommands, {
+      "BufEnter",
+      "*",
+      "lua require'bufferline'.count_visit()",
+    })
   end
 end
 
