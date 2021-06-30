@@ -927,6 +927,9 @@ function M.setup(prefs)
   vim.cmd(
     'command! BufferLineSortByRelativeDirectory lua require"bufferline".sort_buffers_by("relative_directory")'
   )
+  vim.cmd(
+    'command! BufferLineSortByTabs lua require"bufferline".sort_buffers_by("tabs")'
+  )
 
   -- TODO / idea: consider allowing these mappings to open buffers based on their
   -- visual position i.e. <leader>1 maps to the first visible buffer regardless
